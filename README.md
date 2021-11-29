@@ -2,7 +2,7 @@
 
 ## Repeating with an image
 
-![](files/Repeating%20UML.jpg)
+![](./Repeating%20UML.jpg)
 
 1. Get notes data filtered by: gray color, archived
 

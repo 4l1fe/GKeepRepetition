@@ -1,6 +1,7 @@
 import json
 
 from getpass import getpass
+from typing import Union
 from gkeepapi import Keep
 from settings import DATA_DIR
 
@@ -13,7 +14,7 @@ class Token:
     FILE = DATA_DIR / 'token'
 
     @staticmethod
-    def read():
+    def read() -> Union[None, str]:
         if not Token.FILE.exists():
             return None
 
@@ -34,19 +35,20 @@ class Keeep(Keep):
         super().sync(*args, **kwargs)
         print('synced')
         state = self.dump()
+
         if dump:
             print('dump')
             with open(STATE_FILE, 'w') as file:
                 json.dump(state, file)
 
-    def login(self, *args, **kwargs):
+    def login(self, email, *args, **kwargs):
         token = Token.read()
         state = None
         if STATE_FILE.exists():
             with open(STATE_FILE, 'r') as file:
                 state = json.load(file)
 
-        email = input('Email: ')
+        # email = input('Email: ')
         if token:
             print('resume')
             self.resume(email, token, state=state)

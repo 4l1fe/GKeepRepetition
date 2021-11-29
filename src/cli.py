@@ -1,27 +1,43 @@
+import os
 import gkeepapi
 import click
 
-from db import db, drop_db
+from types import SimpleNamespace
+from db import DB
 from utils import print_note
 from keep import Keeep
+from settings import DATA_DIR
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 
 PINNED_COUNT = 10
 REPEATING_COUNT = 1
-TEXT_TITLE_SEP = '\n\n' 
+TEXT_TITLE_SEP = '\n\n'
+CLIENT_SECRETS_FILE = DATA_DIR / "secrets.json"
+SCOPES = ['https://www.googleapis.com/auth/memento', 'https://www.googleapis.com/auth/reminders']
+
+
+@click.command()
+def gapi():
+	os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+	flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE.as_posix(), gkeepapi.Keep.OAUTH_SCOPES)
+	credentials = flow.run_console()
+	print(flow.credentials.token)
 
 
 @click.group()
+@click.argument('email')
 @click.pass_context
-def kapi(ctx):
-	ctx.obj = Keeep().login()
-	db.open()
+def kapi(ctx, email):
+	ctx.obj = SimpleNamespace()
+	ctx.obj.keep = Keeep().login(email)
+	ctx.obj.db = DB()
 
 
 @kapi.command()
 @click.pass_obj
-def test(keep):
-	notes = keep.find(colors=[gkeepapi.node.ColorValue.White], archived=False)
+def test(obj):
+	notes = obj.keep.find(colors=[gkeepapi.node.ColorValue.White], archived=False)
 	n = next(notes)
 	print_note(n)
 
@@ -69,12 +85,12 @@ def hide(keep, color, archived, count):
 
 @kapi.command()
 @click.pass_obj
-def unhide(keep):
+def unhidie(keep):
 	with db.cursor() as cur:
 		for nid, data in cur:
 			note = keep.get(nid)
 			data = data.decode()
-			title, text  = data.split(TEXT_TITLE_SEP, maxsplit=1)
+			title, text = data.split(TEXT_TITLE_SEP, maxsplit=1)
 			note.title = title
 			note.text = text
 			note.archived = True
@@ -86,4 +102,5 @@ def unhide(keep):
 
 
 if __name__ == '__main__':
+	# gapi()
 	kapi()
