@@ -5,7 +5,7 @@ import click
 from types import SimpleNamespace
 from db import DB
 from utils import print_note
-from keep import Keeep
+from keep import Keep
 from settings import DATA_DIR
 from google_auth_oauthlib.flow import InstalledAppFlow
 
@@ -30,29 +30,34 @@ def gapi():
 @click.pass_context
 def kapi(ctx, email):
 	ctx.obj = SimpleNamespace()
-	ctx.obj.keep = Keeep().login(email)
+	ctx.obj.keep = Keep().login(email)
 	ctx.obj.db = DB()
 
 
 @kapi.command()
+@click.option('--dump', type=click.BOOL, default=False)
 @click.pass_obj
-def test(obj):
+def test(obj, dump):
 	notes = obj.keep.find(colors=[gkeepapi.node.ColorValue.White], archived=False)
 	n = next(notes)
 	print_note(n)
+
+	if dump:
+		state = obj.keep.dump()
+		obj.keep.file_dump(state)
 
 
 @kapi.command()
 @click.option('--count', default=PINNED_COUNT)
 @click.pass_obj
-def pin_oldest(keep, count):
-	notes = keep.find(colors=[gkeepapi.node.ColorValue.White], archived=False)
+def pin_oldest(obj, count):
+	notes = obj.keep.find(colors=[gkeepapi.node.ColorValue.White], archived=False)
 	notes = sorted(notes, key=lambda n: n.timestamps.created)[:count]
 	for n in notes:
 		print_note(n)
 		n.pinned = True
 
-	keep.sync(dump=True)
+	obj.keep.sync(dump=True)
 
 
 @kapi.command()
@@ -61,12 +66,12 @@ def pin_oldest(keep, count):
 @click.option('--archived / --no-archived', default=True)
 @click.option('--count', type=int, default=REPEATING_COUNT)
 @click.pass_obj
-def hide(keep, color, archived, count):
-	with db.cursor() as cur:
-		for item in  cur:
+def hide(obj, color, archived, count):
+	with obj.db.cursor() as cur:
+		for item in cur:
 			raise click.Abort("DB isn't empty")
 
-	notes = keep.find(colors=[gkeepapi.node.ColorValue[color]], archived=archived)
+	notes = obj.keep.find(colors=[gkeepapi.node.ColorValue[color]], archived=archived)
 	data = {}
 	for i, n in enumerate(notes, start=1):
 		print_note(n)
@@ -78,17 +83,16 @@ def hide(keep, color, archived, count):
 			break
 
 	print(len(data))
-	db.update(data)
-
-	keep.sync(dump=True)
+	obj.db.update(data)
+	obj.keep.sync(dump=True)
 
 
 @kapi.command()
 @click.pass_obj
-def unhidie(keep):
-	with db.cursor() as cur:
+def unhidie(obj):
+	with obj.db.cursor() as cur:
 		for nid, data in cur:
-			note = keep.get(nid)
+			note = obj.keep.get(nid)
 			data = data.decode()
 			title, text = data.split(TEXT_TITLE_SEP, maxsplit=1)
 			note.title = title
@@ -97,8 +101,8 @@ def unhidie(keep):
 			note.pinned = False
 			print_note(note)
 
-	keep.sync(dump=True)
-	drop_db()
+	obj.keep.sync(dump=True)
+	obj.db.drop_db()
 
 
 if __name__ == '__main__':

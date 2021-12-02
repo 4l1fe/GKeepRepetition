@@ -1,8 +1,9 @@
 import json
+import deepdiff
 
 from getpass import getpass
 from typing import Union
-from gkeepapi import Keep
+from gkeepapi import Keep as _Keep
 from settings import DATA_DIR
 
 
@@ -28,35 +29,39 @@ class Token:
             file.write(token)
 
 
-class Keeep(Keep):
+class Keep(_Keep):
+
+    def file_dump(self, state):
+        print('dump')
+        with open(STATE_FILE, 'w') as file:
+            json.dump(state, file)
 
     def sync(self, *args, **kwargs):
         dump = kwargs.pop('dump', False)
+
+        prev_state = self.dump()
         super().sync(*args, **kwargs)
         print('synced')
-        state = self.dump()
+        cur_state = self.dump()
 
         if dump:
-            print('dump')
-            with open(STATE_FILE, 'w') as file:
-                json.dump(state, file)
+            self.file_dump(cur_state)
 
-    def login(self, email, *args, **kwargs):
+    def login(self, email, **kwargs):
         token = Token.read()
         state = None
         if STATE_FILE.exists():
             with open(STATE_FILE, 'r') as file:
                 state = json.load(file)
 
-        # email = input('Email: ')
         if token:
             print('resume')
-            self.resume(email, token, state=state)
+            self.resume(email, token, state=state, **kwargs)
             return self
 
         print('login')
         psw = getpass('Password: ')
-        super(Keeep, self).login(email, psw, *args, state=state, **kwargs)
+        super(Keep, self).login(email, psw, state=state, **kwargs)
         token = self.getMasterToken()
         Token.write(token)
         return self
