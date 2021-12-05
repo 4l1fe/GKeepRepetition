@@ -1,0 +1,4 @@
+click==8.0.3
+deepdiff==5.6.0
+gkeepapi==0.13.6
+peewee==3.14.8

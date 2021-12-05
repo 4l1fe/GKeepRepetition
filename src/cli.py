@@ -1,50 +1,61 @@
-import os
+from types import SimpleNamespace
+
+
 import gkeepapi
 import click
+import typer
 
-from types import SimpleNamespace
-from db import DB
 from utils import print_note
 from keep import Keep
-from settings import DATA_DIR
-from google_auth_oauthlib.flow import InstalledAppFlow
+from data import database
+from application import Application
 
 
 PINNED_COUNT = 10
 REPEATING_COUNT = 1
 TEXT_TITLE_SEP = '\n\n'
-CLIENT_SECRETS_FILE = DATA_DIR / "secrets.json"
-SCOPES = ['https://www.googleapis.com/auth/memento', 'https://www.googleapis.com/auth/reminders']
-
-
-@click.command()
-def gapi():
-	os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-	flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE.as_posix(), gkeepapi.Keep.OAUTH_SCOPES)
-	credentials = flow.run_console()
-	print(flow.credentials.token)
 
 
 @click.group()
 @click.argument('email')
+@click.option('--sync', type=click.BOOL, default=False)
 @click.pass_context
-def kapi(ctx, email):
+def kapi(ctx, email, sync):
 	ctx.obj = SimpleNamespace()
-	ctx.obj.keep = Keep().login(email)
-	ctx.obj.db = DB()
+	ctx.obj.keep = Keep().login(email, sync=sync)
+	ctx.obj.db = database
 
 
 @kapi.command()
-@click.option('--dump', type=click.BOOL, default=False)
 @click.pass_obj
-def test(obj, dump):
+def test(obj):
 	notes = obj.keep.find(colors=[gkeepapi.node.ColorValue.White], archived=False)
 	n = next(notes)
 	print_note(n)
 
-	if dump:
-		state = obj.keep.dump()
-		obj.keep.file_dump(state)
+
+@kapi.command()
+@click.pass_obj
+def dump_state(obj):
+	obj.keep.sync()
+	state = obj.keep.dump()
+	obj.keep.file_dump(state)
+
+
+@kapi.command()
+@click.option('--dry-run', type=click.BOOL, default=False)
+@click.pass_obj
+def create_events(obj, dry_run):
+	prev_state = obj.keep.dump()
+	print('Syncing...')
+	obj.keep.sync()
+	print('Synced.')
+	cur_state = obj.keep.dump()
+
+	obj.keep.file_dump(cur_state)
+
+	if create_events:
+		pass
 
 
 @kapi.command()
@@ -105,6 +116,37 @@ def unhidie(obj):
 	obj.db.drop_db()
 
 
+cli = typer.Typer()
+
+
+@cli.callback()
+def main(email: str, ctx: typer.Context, sync: bool = False):
+	app = Application(email, sync=sync)
+	ctx.obj: Application = app
+
+
+@cli.command()
+def create_events(ctx: typer.Context, dry_run: bool = False):
+	if dry_run:
+		print('Dry run.')
+		previous_state, current_state = ctx.obj.get_states()
+		events = ctx.obj.make_events(previous_state['nodes'], current_state['nodes'])
+		print(len(events), events)
+		return
+
+	ctx.obj.save_events()
+
+
+@cli.command()
+def sync(ctx: typer.Context):
+	ctx.obj.sync()
+
+
+@cli.command()
+def test(ctx: typer.Context):
+	print(ctx)
+
+
 if __name__ == '__main__':
-	# gapi()
-	kapi()
+	# kapi()
+	cli()
