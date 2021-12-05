@@ -1,5 +1,5 @@
+import logging
 from types import SimpleNamespace
-
 
 import gkeepapi
 import click
@@ -14,6 +14,7 @@ from application import Application
 PINNED_COUNT = 10
 REPEATING_COUNT = 1
 TEXT_TITLE_SEP = '\n\n'
+logger = logging.getLogger()
 
 
 @click.group()
@@ -47,9 +48,9 @@ def dump_state(obj):
 @click.pass_obj
 def create_events(obj, dry_run):
 	prev_state = obj.keep.dump()
-	print('Syncing...')
+	logger.info('Syncing...')
 	obj.keep.sync()
-	print('Synced.')
+	logger.info('Synced.')
 	cur_state = obj.keep.dump()
 
 	obj.keep.file_dump(cur_state)
@@ -93,7 +94,7 @@ def hide(obj, color, archived, count):
 		if i == count:
 			break
 
-	print(len(data))
+	logger.info(len(data))
 	obj.db.update(data)
 	obj.keep.sync(dump=True)
 
@@ -120,7 +121,8 @@ cli = typer.Typer()
 
 
 @cli.callback()
-def main(email: str, ctx: typer.Context, sync: bool = False):
+def main(email: str, ctx: typer.Context, sync: bool = False, log_level: str = 'DEBUG'):
+	logging.basicConfig(level=log_level)
 	app = Application(email, sync=sync)
 	ctx.obj: Application = app
 
@@ -128,13 +130,14 @@ def main(email: str, ctx: typer.Context, sync: bool = False):
 @cli.command()
 def create_events(ctx: typer.Context, dry_run: bool = False):
 	if dry_run:
-		print('Dry run.')
+		logger.info('Dry run.')
 		previous_state, current_state = ctx.obj.get_states()
 		events = ctx.obj.make_events(previous_state['nodes'], current_state['nodes'])
-		print(len(events), events)
+		logger.info(len(events), events)
+		logger.info(events)
 		return
 
-	ctx.obj.save_events()
+	ctx.obj.create_events()
 
 
 @cli.command()
@@ -144,9 +147,10 @@ def sync(ctx: typer.Context):
 
 @cli.command()
 def test(ctx: typer.Context):
-	print(ctx)
+	logger.info(ctx)
 
 
 if __name__ == '__main__':
 	# kapi()
 	cli()
+
