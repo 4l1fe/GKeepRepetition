@@ -1,7 +1,7 @@
 from peewee import *
 from playhouse.sqlite_ext import SqliteExtDatabase, JSONField
 
-from constants import TYPE_UPDATED, TYPE_CREATED, TYPE_DELETED
+from constants import EventType
 from settings import DATA_DIR
 
 
@@ -11,7 +11,7 @@ database = SqliteExtDatabase(DB_FILE.as_posix())
 
 class Event(Model):
     created = DateTimeField()
-    type = SmallIntegerField(choices=[TYPE_UPDATED, TYPE_CREATED, TYPE_DELETED])
+    type = SmallIntegerField(choices=EventType.values())
     data = JSONField()
 
     class Meta:

@@ -7,8 +7,8 @@ import typer
 
 from utils import print_note
 from keep import Keep
-from data import database
-from application import Application
+from data_layer import database
+from app_layer import Application
 
 
 PINNED_COUNT = 10
@@ -133,7 +133,7 @@ def create_events(ctx: typer.Context, dry_run: bool = False):
 		logger.info('Dry run.')
 		previous_state, current_state = ctx.obj.get_states()
 		events = ctx.obj.make_events(previous_state['nodes'], current_state['nodes'])
-		logger.info(len(events), events)
+		logger.info(len(events))
 		logger.info(events)
 		return
 

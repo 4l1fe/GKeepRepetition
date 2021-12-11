@@ -5,10 +5,10 @@ from typing import Tuple
 from deepdiff import DeepDiff
 from deepdiff.helper import NotPresent
 
-from data import Event, database
+from data_layer import Event, database
 from utils import get_root_key
 from keep import Keep
-from constants import TYPE_UPDATED, TYPE_CREATED, TYPE_DELETED
+from constants import EventType
 
 
 logger = logging.getLogger()
@@ -55,8 +55,8 @@ class Application:
         for dlevel in values_changed:
             server_id = get_root_key(dlevel)
             data = find_node(current_nodes, server_id)
-            logger.debug(TYPE_UPDATED)
-            event = Event(created=datetime.utcnow(), type=TYPE_UPDATED, data=data)
+            logger.debug(EventType.UPDATED)
+            event = Event(created=datetime.utcnow(), type=EventType.UPDATED, data=data)
             events[server_id] = event
 
         dictionary_item_added = diff.get('dictionary_item_added', list())
@@ -64,9 +64,9 @@ class Application:
         for dlevel in dictionary_item_added:
             server_id = get_root_key(dlevel)
             data = find_node(current_nodes, server_id)
-            type_ = TYPE_UPDATED
+            type_ = EventType.UPDATED
             if isinstance(dlevel.t1, NotPresent):
-                type_ = TYPE_CREATED
+                type_ = EventType.CREATED
             logger.debug(type_)
             event = Event(created=datetime.utcnow(), type=type_, data=data)
             events[server_id] = event
@@ -75,11 +75,11 @@ class Application:
         logger.debug('dictionary_item_removed')
         for dlevel in dictionary_item_removed:
             server_id = get_root_key(dlevel)
-            type_ = TYPE_UPDATED
+            type_ = EventType.UPDATED
             if isinstance(dlevel.t2, NotPresent):
-                type_ = TYPE_DELETED
+                type_ = EventType.DELETED
             logger.debug(type_)
-            data = find_node(previous_nodes, server_id) if type_ == TYPE_DELETED else find_node(current_nodes, server_id)
+            data = find_node(previous_nodes, server_id) if type_ == EventType.DELETED else find_node(current_nodes, server_id)
             event = Event(created=datetime.utcnow(), type=type_, data=data)
             events[server_id] = event
 
