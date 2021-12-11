@@ -45,6 +45,7 @@ class Application:
     def make_events(self, previous_nodes, current_nodes) -> Tuple[Event]:
         """Очередность перезаписи элементов словаря событий: обновленные, созданные, удаленные. Удаленные должны
          остаться последними, созданные должны переписать обновленные"""
+
         logger.info('Compare the previous and current states.')
         diff = DeepDiff(previous_nodes, current_nodes, exclude_regex_paths="\['sortValue'\]", group_by='serverId',
                         view='tree')

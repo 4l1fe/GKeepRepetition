@@ -1,50 +1,23 @@
-import json
 import logging
-from typing import Union
 from getpass import getpass
 
 from gkeepapi import Keep as _Keep
 
-from settings import DATA_DIR
+from data_layer import Token, State
 
 
 logger = logging.getLogger()
 
 
-class Token:
-
-    FILE = DATA_DIR / 'token'
-
-    @staticmethod
-    def read() -> Union[None, str]:
-        if not Token.FILE.exists():
-            return None
-
-        with open(Token.FILE.as_posix(), 'r') as file:
-            token = file.read()
-        return token
-
-    @staticmethod
-    def write(token):
-        with open(Token.FILE.as_posix(), 'w') as file:
-            file.write(token)
-
-
 class Keep(_Keep):
-
-    FILE = DATA_DIR / 'state.json'
 
     @staticmethod
     def file_dump(state):
-        with open(Keep.FILE, 'w') as file:
-            json.dump(state, file)
+        State.write(state)
 
     def login(self, email, **kwargs):
         token = Token.read()
-        state = None
-        if Keep.FILE.exists():
-            with open(Keep.FILE, 'r') as file:
-                state = json.load(file)
+        state = State.read()
 
         if token:
             logger.info('Resume.')
