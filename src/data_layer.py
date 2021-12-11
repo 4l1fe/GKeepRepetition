@@ -19,7 +19,8 @@ class Event(Model):
         table_name = 'events'
 
     def __str__(self):
-        return self.created.isoformat(sep=' ', timespec='seconds'), self.type
+        return self.created.isoformat(sep=' ', timespec='seconds'), EventType(self.type).name
+
 
 
 def create_tables():
