@@ -10,3 +10,6 @@ class EventType(enum.IntEnum):
     @staticmethod
     def values() -> List[int]:
         return [m.value for m in EventType]
+
+
+LEAST_UPDATED_COUNT = 5

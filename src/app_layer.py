@@ -1,21 +1,18 @@
 import logging
 from datetime import datetime
-from typing import Tuple, Iterator
+from typing import Tuple, Iterator, List
 
 from gkeepapi.node import ColorValue, NodeType, Node
 from deepdiff import DeepDiff
 from deepdiff.helper import NotPresent
 
-from data_layer import Event, database
 from utils import get_root_key
-from keep import Keep
-from constants import EventType
+from data_layer.keep import Keep
+from data_layer.models import Event, database
+from constants import EventType, LEAST_UPDATED_COUNT
 
 
 logger = logging.getLogger()
-
-
-LEAST_UPDATED_COUNT = 5
 
 
 def find_node(nodes, server_id):
@@ -28,25 +25,28 @@ def find_node(nodes, server_id):
 
 class Application:
 
-    def __init__(self, email, sync_on_login=False):
+    def __init__(self, email):
+        """Устанавливает соединение, реконструирует состояние, но не синхронизируется."""
         self.keep = Keep()
-        self.keep.login(email, sync=sync_on_login)
+        self.keep.login(email, sync=False)
 
     def sync_and_dump(self):
         self.keep.sync()
         state = self.keep.dump()
-        Keep.file_dump(state)
+        self.keep.current_state = state
 
-    def sync_and_get_states(self) -> tuple:
+    def sync_and_get_states(self) -> Tuple[dict, dict]:
         prev_state = self.keep.dump()
+
         logger.info('Syncing...')
         self.keep.sync()
         logger.info('Synced.')
+
         cur_state = self.keep.dump()
 
         return prev_state, cur_state
 
-    def make_events(self, previous_nodes, current_nodes) -> Tuple[Event]:
+    def make_events(self, previous_nodes, current_nodes) -> List[Event]:
         """Очередность перезаписи элементов словаря событий: обновленные, созданные, удаленные. Удаленные должны
          остаться последними, созданные должны переписать обновленные"""
 
@@ -88,15 +88,16 @@ class Application:
             event = Event(created=datetime.utcnow(), type=type_, data=data)
             events[server_id] = event
 
-        return tuple(events.values())
+        return list(events.values())
 
     def create_events(self):
         previous_state, current_state = self.sync_and_get_states()
+
         events = self.make_events(previous_state['nodes'], current_state['nodes'])
 
         with database.transaction():
             Event.bulk_create(events)
-            Keep.file_dump(current_state)
+            self.keep.current_state = current_state
 
         logger.info('Created %s events.', len(events))
 
