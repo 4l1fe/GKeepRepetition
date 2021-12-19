@@ -9,7 +9,7 @@ from settings import DATA_DIR
 
 
 DB_FILE = DATA_DIR / 'keep.sqlite'
-database = SqliteExtDatabase(DB_FILE.as_posix())
+database = SqliteExtDatabase(DB_FILE.as_posix(),  pragmas={'journal_mode': 'wal'})
 
 
 class Event(Model):

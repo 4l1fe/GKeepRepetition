@@ -8,7 +8,7 @@ import typer
 from utils import print_note
 from keep import Keep
 from data_layer import database
-from app_layer import Application
+from app_layer import Application, LEAST_UPDATED_COUNT
 
 
 PINNED_COUNT = 10
@@ -38,7 +38,7 @@ def test(obj):
 @kapi.command()
 @click.pass_obj
 def dump_state(obj):
-	obj.keep.sync()
+	obj.keep.sync_and_dump()
 	state = obj.keep.dump()
 	obj.keep.file_dump(state)
 
@@ -49,7 +49,7 @@ def dump_state(obj):
 def create_events(obj, dry_run):
 	prev_state = obj.keep.dump()
 	logger.info('Syncing...')
-	obj.keep.sync()
+	obj.keep.sync_and_dump()
 	logger.info('Synced.')
 	cur_state = obj.keep.dump()
 
@@ -69,7 +69,7 @@ def pin_oldest(obj, count):
 		print_note(n)
 		n.pinned = True
 
-	obj.keep.sync(dump=True)
+	obj.keep.sync_and_dump(dump=True)
 
 
 @kapi.command()
@@ -96,7 +96,7 @@ def hide(obj, color, archived, count):
 
 	logger.info(len(data))
 	obj.db.update(data)
-	obj.keep.sync(dump=True)
+	obj.keep.sync_and_dump(dump=True)
 
 
 @kapi.command()
@@ -113,7 +113,7 @@ def unhidie(obj):
 			note.pinned = False
 			print_note(note)
 
-	obj.keep.sync(dump=True)
+	obj.keep.sync_and_dump(dump=True)
 	obj.db.drop_db()
 
 
@@ -121,9 +121,9 @@ cli = typer.Typer()
 
 
 @cli.callback()
-def main(email: str, ctx: typer.Context, sync: bool = False, log_level: str = 'DEBUG'):
+def init_cli(email: str, ctx: typer.Context, sync_on_login: bool = False, log_level: str = 'DEBUG'):
 	logging.basicConfig(level=log_level)
-	app = Application(email, sync=sync)
+	app = Application(email, sync_on_login=sync_on_login)
 	ctx.obj: Application = app
 
 
@@ -131,7 +131,7 @@ def main(email: str, ctx: typer.Context, sync: bool = False, log_level: str = 'D
 def create_events(ctx: typer.Context, dry_run: bool = False):
 	if dry_run:
 		logger.info('Dry run.')
-		previous_state, current_state = ctx.obj.get_states()
+		previous_state, current_state = ctx.obj.sync_and_get_states()
 		events = ctx.obj.make_events(previous_state['nodes'], current_state['nodes'])
 		logger.info(len(events))
 		logger.info(events)
@@ -141,8 +141,19 @@ def create_events(ctx: typer.Context, dry_run: bool = False):
 
 
 @cli.command()
+def pin_default_least_updated(ctx: typer.Context, count: int = LEAST_UPDATED_COUNT, dry_run: bool = False):
+	if dry_run:
+		nodes = ctx.obj.find_default_least_updated_iter(count=count)
+		for n in nodes:
+			logger.info(n)
+		return
+
+	ctx.obj.pin_default_least_updated(count=count)
+
+
+@cli.command()
 def sync(ctx: typer.Context):
-	ctx.obj.sync()
+	ctx.obj.sync_and_dump()
 
 
 @cli.command()
@@ -151,6 +162,9 @@ def test(ctx: typer.Context):
 
 
 if __name__ == '__main__':
-	# kapi()
-	cli()
+	from patching import Patch
+
+	with Patch():
+		# kapi()
+		cli()
 
