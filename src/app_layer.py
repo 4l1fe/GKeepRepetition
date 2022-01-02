@@ -5,10 +5,11 @@ from typing import Tuple, Iterator, List
 from gkeepapi.node import ColorValue, NodeType, Node
 from deepdiff import DeepDiff
 from deepdiff.helper import NotPresent
+from peewee import fn
 
 from utils import get_root_key
 from data_layer.keep import Keep
-from data_layer.models import Event, database
+from data_layer.models import Event, EventNormalizedView, database
 from constants import EventType, LEAST_UPDATED_COUNT
 
 
@@ -120,3 +121,7 @@ class Application:
             node.pinned = True
 
         self.create_events()
+
+    def get_created_group_days(self):
+        nc = fn.SUBSTR(EventNormalizedView.note_created, 1, 10).alias('nc')
+        return EventNormalizedView.select(nc, fn.count()).group_by(nc).namedtuples()

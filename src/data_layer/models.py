@@ -29,6 +29,30 @@ class Event(Model):
         return self.created.isoformat(sep=' ', timespec='seconds'), EventType(self.type).name
 
 
+class EventNormalizedView(Model):
+    event_id = PrimaryKeyField()
+    event_created = DateTimeField()
+    event_type = SmallIntegerField(choices=EventType.values())
+    note_server_id = TextField()
+    note_id = TextField()
+    note_parent_id = TextField()
+    note_type = TextField()
+    note_title = TextField()
+    note_text = TextField()
+    note_extracted_text = TextField()
+    note_ispinned = TextField()
+    note_isarchived = TextField()
+    note_color = TextField()
+    note_created = TextField()
+    note_trashed = TextField()
+    note_updated = TextField()
+    note_user_edited = TextField()
+
+    class Meta:
+        database = database
+        table_name = 'events_normalized'
+
+
 class KVRecordAttribute:
 
     def __set_name__(self, owner, name):
