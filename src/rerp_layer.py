@@ -88,10 +88,5 @@ def pin_default_least_updated(ctx: typer.Context, count: int = LEAST_UPDATED_COU
 
 
 @cli.command()
-def sync(ctx: typer.Context):
-	ctx.obj.sync_and_dump()
-
-
-@cli.command()
 def test(ctx: typer.Context):
 	logger.info(ctx)
