@@ -1,9 +1,11 @@
 import logging
 
 import typer
+import pandas as pd
 
-from app_layer import Application
-from constants import LEAST_UPDATED_COUNT
+from settings import DATA_DIR
+from app_layer import SyncApplication, DataApplication
+from constants import LEAST_UPDATED_COUNT, EventType
 
 logger = logging.getLogger()
 
@@ -52,18 +54,28 @@ logger = logging.getLogger()
 # 	obj.keep.sync_and_dump(dump=True)
 # 	obj.db.drop_db()
 
-
+keep_cli = typer.Typer()
+charts_cli = typer.Typer()
 cli = typer.Typer()
+cli.add_typer(keep_cli, name='keep')
+cli.add_typer(charts_cli, name='charts')
 
 
-@cli.callback()
-def init_cli(email: str, ctx: typer.Context, log_level: str = 'DEBUG'):
+@keep_cli.callback()
+def init_keep_cli(email: str, ctx: typer.Context, log_level: str = 'INFO'):
 	logging.basicConfig(level=log_level)
-	app = Application(email)
-	ctx.obj: Application = app
+	app = SyncApplication(email)
+	ctx.obj: SyncApplication = app
 
 
-@cli.command()
+@charts_cli.callback()
+def init_charts_cli(ctx: typer.Context, log_level: str = 'INFO'):
+	logging.basicConfig(level=log_level)
+	app = DataApplication()
+	ctx.obj: DataApplication = app
+
+
+@keep_cli.command()
 def create_events(ctx: typer.Context, dry_run: bool = False):
 	if dry_run:
 		logger.info('Dry run.')
@@ -76,7 +88,7 @@ def create_events(ctx: typer.Context, dry_run: bool = False):
 	ctx.obj.create_events()
 
 
-@cli.command()
+@keep_cli.command()
 def pin_default_least_updated(ctx: typer.Context, count: int = LEAST_UPDATED_COUNT, dry_run: bool = False):
 	if dry_run:
 		nodes = ctx.obj.find_default_least_updated_iter(count=count)
@@ -87,6 +99,25 @@ def pin_default_least_updated(ctx: typer.Context, count: int = LEAST_UPDATED_COU
 	ctx.obj.pin_default_least_updated(count=count)
 
 
-@cli.command()
+@keep_cli.command()
 def test(ctx: typer.Context):
 	logger.info(ctx)
+
+
+@charts_cli.command()
+def create_chart(ctx: typer.Context, type_,  w: int = 40, h: int = 10,
+				 file: str = DATA_DIR.joinpath('added-chart.png').as_posix()):
+	if type_ == EventType.CREATED:
+		groups = ctx.obj.get_day_groups_created_notes()
+	elif type_ == EventType.UPDATED:
+		groups = ctx.obj.get_day_groups_updated_notes()
+	elif type_ == EventType.DELETED:
+		groups = ctx.obj.get_day_groups_deleted_notes()
+
+	df = pd.DataFrame(groups)
+	df.set_index('note_created_date')
+	df.index = pd.to_datetime(df.index)
+	plot = df.plot.bar()
+	plot.figure.set_size_inches(w,h)
+	plot.figure.savefig(file)
+	logger.info('Saved to %s', file)

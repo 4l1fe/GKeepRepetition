@@ -12,7 +12,6 @@ from data_layer.keep import Keep
 from data_layer.models import Event, EventNormalizedView, database
 from constants import EventType, LEAST_UPDATED_COUNT
 
-
 logger = logging.getLogger()
 
 
@@ -24,7 +23,7 @@ def find_node(nodes, server_id):
     raise LookupError('No element')
 
 
-class Application:
+class SyncApplication:
 
     def __init__(self, email):
         """Устанавливает соединение, реконструирует состояние, но не синхронизируется."""
@@ -85,7 +84,8 @@ class Application:
             if isinstance(dlevel.t2, NotPresent):
                 type_ = EventType.DELETED
             logger.debug(type_)
-            data = find_node(previous_nodes, server_id) if type_ == EventType.DELETED else find_node(current_nodes, server_id)
+            data = find_node(previous_nodes, server_id) if type_ == EventType.DELETED else find_node(current_nodes,
+                                                                                                     server_id)
             event = Event(created=datetime.utcnow(), type=type_, data=data)
             events[server_id] = event
 
@@ -122,6 +122,26 @@ class Application:
 
         self.create_events()
 
-    def get_created_group_days(self):
-        nc = fn.SUBSTR(EventNormalizedView.note_created, 1, 10).alias('nc')
-        return EventNormalizedView.select(nc, fn.count()).group_by(nc).namedtuples()
+
+class DataApplication:
+
+    def _get_day_groups(self, type_: EventType):
+        note_created_date = fn.SUBSTR(EventNormalizedView.note_created, 1, 10).alias('note_created_date')
+        groups = EventNormalizedView.select(note_created_date, fn.count()) \
+            .where(EventNormalizedView.note_type == 'NOTE', EventNormalizedView.event_type == type_) \
+            .group_by(note_created_date) \
+            .namedtuples()
+        logger.debug(groups)
+        return groups
+
+    def get_day_groups_created_notes(self):
+        groups = self._get_day_groups(EventType.CREATED)
+        return groups
+
+    def get_day_groups_updated_notes(self):
+        groups = self._get_day_groups(EventType.UPDATED)
+        return groups
+
+    def get_day_groups_deleted_notes(self):
+        groups = self._get_day_groups(EventType.DELETED)
+        return groups
