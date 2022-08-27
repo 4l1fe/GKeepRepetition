@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from typing import Tuple, Iterator, List
 
+import pands as pd
 from gkeepapi.node import ColorValue, NodeType, Node
 from deepdiff import DeepDiff
 from deepdiff.helper import NotPresent
@@ -35,11 +36,11 @@ class SyncApplication:
         state = self.keep.dump()
         self.keep.current_state = state
 
-    def sync_and_get_states(self) -> Tuple[dict, dict]:
+    def sync_and_get_states(self, resync=False) -> Tuple[dict, dict]:
         prev_state = self.keep.dump()
 
         logger.info('Syncing...')
-        self.keep.sync()
+        self.keep.sync(resync=resync)
         logger.info('Synced.')
 
         cur_state = self.keep.dump()
@@ -91,8 +92,8 @@ class SyncApplication:
 
         return list(events.values())
 
-    def create_events(self):
-        previous_state, current_state = self.sync_and_get_states()
+    def create_events(self, resync=False):
+        previous_state, current_state = self.sync_and_get_states(resync=resync)
 
         events = self.make_events(previous_state['nodes'], current_state['nodes'])
 
@@ -123,7 +124,8 @@ class SyncApplication:
         self.create_events()
 
 
-class DataApplication:
+class ChartApplication:
+    """Build charts on data from DB"""
 
     def _get_day_groups(self, type_: EventType):
         note_created_date = fn.SUBSTR(EventNormalizedView.note_created, 1, 10).alias('note_created_date')
@@ -145,3 +147,12 @@ class DataApplication:
     def get_day_groups_deleted_notes(self):
         groups = self._get_day_groups(EventType.DELETED)
         return groups
+
+    def create_chart(groups, width: int, height: int, file):
+        df = pd.DataFrame(groups)
+        df.set_index('note_created_date')
+        df.index = pd.to_datetime(df.index)
+        plot = df.plot.bar()
+        plot.figure.set_size_inches(width, height)
+        plot.figure.savefig(file)
+

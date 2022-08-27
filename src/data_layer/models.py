@@ -1,4 +1,4 @@
-from peewee import *
+from peewee import Model, DateTimeField, SmallIntegerField, ForeignKeyField, PrimaryKeyField, TextField 
 from playhouse.sqlite_ext import SqliteExtDatabase, JSONField
 from playhouse.kv import KeyValue
 
@@ -13,13 +13,23 @@ states_kv = KeyValue(database=database, table_name='keep_states')
 
 def create_tables():
     with database:
-        database.create_tables([Event])
+        database.create_tables([Event, Context])
+
+
+class Context(Model):
+    description = TextField()
+    filters = TextField()
+
+    class Meta:
+        database = database
+        table_name = 'contexts'
 
 
 class Event(Model):
     created = DateTimeField()
     type = SmallIntegerField(choices=EventType.values())
     data = JSONField()
+    context = ForeignKeyField(Context, backref='events', null=True)
 
     class Meta:
         database = database
@@ -43,7 +53,7 @@ class EventNormalizedView(Model):
     note_ispinned = TextField()
     note_isarchived = TextField()
     note_color = TextField()
-    note_created = TextField()
+    note_created = TextField()	
     note_trashed = TextField()
     note_updated = TextField()
     note_user_edited = TextField()
@@ -52,8 +62,8 @@ class EventNormalizedView(Model):
         database = database
         table_name = 'events_normalized'
 
-
-class KVRecordAttribute:
+      
+class _KVRecordAttribute:
 
     def __set_name__(self, owner, name):
         print('Set name', name)
@@ -69,6 +79,6 @@ class KVRecordAttribute:
 
 
 class _States:
-    previous = KVRecordAttribute()
-    current = KVRecordAttribute()
+    previous = _KVRecordAttribute()
+    current = _KVRecordAttribute()
 States = _States()
